@@ -2,13 +2,14 @@
 # para aprender lo conceptual, sin ensuciarse las manos
 
 # limpio la memoria
-rm(list = ls(all.names = TRUE)) # remove all objects
+rm(list = ls(all.names = TRUE)) # remove all objects 
 gc(full = TRUE) # garbage collection
 
 require("rlang")
 require("yaml")
 require("data.table")
 require("ParamHelpers")
+library(caret)
 
 # creo environment global
 envg <- env()
@@ -173,20 +174,22 @@ FE_historia_guantesblancos <- function( pmyexp, pinputexps, pserver="local")
 #   entreno en solo tres meses   ( mas guantes blancos no se puede )
 #   y solo incluyo en el dataset al 5% de los CONTINUA
 
-TS_strategy_guantesblancos_202109 <- function( pmyexp, pinputexps, iterNmbr, pserver="local")
+TS_strategy_guantesblancos_202109 <- function( pmyexp, pinputexps, iterNmbr, train, validation, test, pserver="local")
 {
   if( -1 == (param_local <- exp_init( pmyexp, pinputexps, pserver ))$resultado ) return( 0 )# linea fija
 
   param_local$meta$script <- "/src/workflow-01/z551_TS_training_strategy.r"
 
-
+  param_local$train$training <- train #c(202105, 202104, 202103)
+  param_local$train$validation <- validation #c(202106)
+  param_local$train$testing <- test #c(202107)
+  
+  
   param_local$future <- c(202109)
   param_local$final_train <- c(202107, 202106, 202105)
 
 
-  param_local$train$training <- c(202105, 202104, 202103)
-  param_local$train$validation <- c(202106)
-  param_local$train$testing <- c(202107)
+  
 
   # Atencion  0.1  de  undersampling de la clase mayoritaria,  los CONTINUA
   # 1.0 significa NO undersampling ,  0.1  es quedarse con el 10% de los CONTINUA
@@ -199,20 +202,19 @@ TS_strategy_guantesblancos_202109 <- function( pmyexp, pinputexps, iterNmbr, pse
 #   entreno en solo tres meses ( mas guantes blancos no se puede )
 #   y solo incluyo en el dataset al 5% de los CONTINUA
 
-TS_strategy_guantesblancos_202107 <- function( pmyexp, pinputexps, pserver="local")
+TS_strategy_guantesblancos_202107 <- function( pmyexp, pinputexps, train, validation, test, pserver="local")
 {
   if( -1 == (param_local <- exp_init( pmyexp, pinputexps, pserver ))$resultado ) return( 0 )# linea fija
 
   param_local$meta$script <- "/src/workflow-01/z551_TS_training_strategy.r"
 
-
-  param_local$future <- c(202107)
-  param_local$final_train <- c(202105, 202104, 202103)
-
-
   param_local$train$training <- c(202103, 202102, 202101)
   param_local$train$validation <- c(202104)
   param_local$train$testing <- c(202105)
+  
+  param_local$future <- c(202107)
+  param_local$final_train <- c(202105, 202104, 202103)
+
 
   # Atencion  0.1  de  undersampling de la clase mayoritaria,  los CONTINUA
   # 1.0 significa NO undersampling ,  0.1  es quedarse con el 10% de los CONTINUA
@@ -314,7 +316,7 @@ ZZ_final_guantesblancos <- function( pmyexp, pinputexps, pserver="local")
 # Que predice 202109
 # y ya genera archivos para Kaggle
 
-corrida_guantesblancos_202109 <- function( pnombrewf, iterNmbr, pvirgen=FALSE )
+corrida_guantesblancos_202109 <- function( pnombrewf, iterNmbr, train, validation, test, pvirgen=FALSE )
 {
   if( -1 == exp_wf_init( pnombrewf, pvirgen) ) return(0) # linea fija
 
@@ -324,7 +326,7 @@ corrida_guantesblancos_202109 <- function( pnombrewf, iterNmbr, pvirgen=FALSE )
   DR_drifting_guantesblancos( paste(iterNmbr,"_DR0001"), paste(iterNmbr,"_CA0001") )
   FE_historia_guantesblancos( paste(iterNmbr,"_FE0001"), paste(iterNmbr,"_DR0001") )
 
-  TS_strategy_guantesblancos_202109( paste(iterNmbr,"_TS0001"), paste(iterNmbr,"_FE0001"), iterNmbr )
+  TS_strategy_guantesblancos_202109( paste(iterNmbr,"_TS0001"), paste(iterNmbr,"_FE0001"), iterNmbr, train, validation, test )
 
   HT_tuning_guantesblancos( paste(iterNmbr,"_HT0001"), paste(iterNmbr,"_TS0001") )
 
@@ -341,12 +343,12 @@ corrida_guantesblancos_202109 <- function( pnombrewf, iterNmbr, pvirgen=FALSE )
 #  NO genera archivos para Kaggle
 # por favor notal como este script parte de FE0001
 
-corrida_guantesblancos_202107 <- function( pnombrewf, iterNmbr, pvirgen=FALSE )
+corrida_guantesblancos_202107 <- function( pnombrewf, iterNmbr, train, validation, test, pvirgen=FALSE )
 {
   if( -1 == exp_wf_init( pnombrewf, pvirgen) ) return(0) # linea fija
 
   # Ya tengo corrido FE0001 y parto de alli
-  TS_strategy_guantesblancos_202107( paste(iterNmbr,"_TS0002"), paste(iterNmbr,"_FE0001"), iterNmbr )
+  TS_strategy_guantesblancos_202107( paste(iterNmbr,"_TS0002"), paste(iterNmbr,"_FE0001"), iterNmbr, train, validation, test )
 
   HT_tuning_guantesblancos( paste(iterNmbr,"_HT0002"), paste(iterNmbr,"_TS0002") )
 
@@ -360,17 +362,38 @@ corrida_guantesblancos_202107 <- function( pnombrewf, iterNmbr, pvirgen=FALSE )
 #------------------------------------------------------------------------------
 #Aqui empieza el programa
 
-iterations <- c(1, 2, 3)
+dataset <- fread( "buckets/b1/datasets/competencia_2024.csv.gz" )
+n_samples = length(unique(dataset$foto_mes))
+X <- Filter(function(x) x > 202101 & x < 202108, unique(dataset$foto_mes))
+X
 
-for (x in iterations){
+# Definir la división temporal en 2 conjuntos
+splits <- createTimeSlices(X, initialWindow = 3, horizon = 1, fixedWindow = FALSE)
+splits$train
+splits$test
+
+# Iterar sobre las divisiones, visualizar y ejecutar
+for (i in 1:length(splits$test)) {
+  train_index <- splits$train[i]
+  test_index <- splits$test[i]
+  
+  train <- X[unlist(train_index)]
+  validation <- X[unlist(test_index)]
+  test <- X[unlist(test_index + 1)]
+  
+  cat('Observations:', length(train) + length(validation), '\n')
+  cat('Training Observations:', length(train), ' -> ' ,train, '\n')
+  cat('Validation Observations:', length(validation), ' -> ', validation, '\n')
+  cat('Testing Observations:', length(test), ' -> ', test, '\n')
+  
   # Hago primero esta corrida que me genera los experimentos
   # DT0001, CA0001, DR0001, FE0001, TS0001, HT0001 y ZZ0001
-  corrida_guantesblancos_202109( "gb01", x )
+  corrida_guantesblancos_202109( "gb01", i, train, validation, test )
   
   
   # Luego partiendo de  FE0001
   # genero TS0002, HT0002 y ZZ0002
   
-  corrida_guantesblancos_202107( "gb02", x )
+  corrida_guantesblancos_202107( "gb02", i, train, validation, test )
+}
 
-} 
