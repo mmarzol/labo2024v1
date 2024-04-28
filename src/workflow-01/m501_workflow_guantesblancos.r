@@ -318,20 +318,21 @@ ZZ_final_guantesblancos <- function( pmyexp, pinputexps, pserver="local")
 
 corrida_guantesblancos_202109 <- function( pnombrewf, iterNmbr, train, validation, test, pvirgen=FALSE )
 {
+  cat('Guantes blancos:', iterNmbr, '\n')
   if( -1 == exp_wf_init( pnombrewf, pvirgen) ) return(0) # linea fija
 
-  DT_incorporar_dataset_default( paste(iterNmbr, "_DT0001"), "competencia_2024.csv.gz")
-  CA_catastrophe_default( paste(iterNmbr,"_CA0001"), paste(iterNmbr,"_DT0001") )
+  DT_incorporar_dataset_default( paste(iterNmbr, "_DT0001", sep=""), "competencia_2024.csv.gz")
+  CA_catastrophe_default( paste(iterNmbr,"_CA0001", sep=""), paste(iterNmbr,"_DT0001", sep="") )
 
-  DR_drifting_guantesblancos( paste(iterNmbr,"_DR0001"), paste(iterNmbr,"_CA0001") )
-  FE_historia_guantesblancos( paste(iterNmbr,"_FE0001"), paste(iterNmbr,"_DR0001") )
+  DR_drifting_guantesblancos( paste(iterNmbr,"_DR0001", sep=""), paste(iterNmbr,"_CA0001", sep="") )
+  FE_historia_guantesblancos( paste(iterNmbr,"_FE0001", sep=""), paste(iterNmbr,"_DR0001", sep="") )
 
-  TS_strategy_guantesblancos_202109( paste(iterNmbr,"_TS0001"), paste(iterNmbr,"_FE0001"), iterNmbr, train, validation, test )
+  TS_strategy_guantesblancos_202109( paste(iterNmbr,"_TS0001", sep=""), paste(iterNmbr,"_FE0001", sep=""), iterNmbr, train, validation, test )
 
-  HT_tuning_guantesblancos( paste(iterNmbr,"_HT0001"), paste(iterNmbr,"_TS0001") )
+  HT_tuning_guantesblancos( paste(iterNmbr,"_HT0001", sep=""), paste(iterNmbr,"_TS0001", sep="") )
 
   # El ZZ depente de HT y TS
-  ZZ_final_guantesblancos( paste(iterNmbr,"_ZZ0001"), c(paste(iterNmbr,"_HT0001"),paste(iterNmbr,"_TS0001")) )
+  ZZ_final_guantesblancos( paste(iterNmbr,"_ZZ0001", sep=""), c(paste(iterNmbr,"_HT0001", sep=""),paste(iterNmbr,"_TS0001", sep="")) )
 
 
   exp_wf_end( pnombrewf, pvirgen ) # linea fija
@@ -362,25 +363,26 @@ corrida_guantesblancos_202107 <- function( pnombrewf, iterNmbr, train, validatio
 #------------------------------------------------------------------------------
 #Aqui empieza el programa
 
-dataset <- fread( "buckets/b1/datasets/competencia_2024.csv.gz" )
+dataset <- fread( "~/buckets/b1/datasets/competencia_2024.csv.gz" )
 n_samples = length(unique(dataset$foto_mes))
-X <- Filter(function(x) x > 202101 & x < 202108, unique(dataset$foto_mes))
+X <- Filter(function(x) x > 202101, unique(dataset$foto_mes))
 X
 
 # Definir la división temporal en 2 conjuntos
-splits <- createTimeSlices(X, initialWindow = 3, horizon = 1, fixedWindow = FALSE)
+splits <- createTimeSlices(X, initialWindow = 3, horizon = 1, fixedWindow = TRUE)
 splits$train
 splits$test
 
 # Iterar sobre las divisiones, visualizar y ejecutar
-for (i in 1:length(splits$test)) {
+for (i in 1:(length(splits$test)-1)) {
   train_index <- splits$train[i]
   test_index <- splits$test[i]
   
   train <- X[unlist(train_index)]
   validation <- X[unlist(test_index)]
-  test <- X[unlist(test_index + 1)]
+  test <- X[unlist(test_index)+1]
   
+  cat('iterNmbr:', i, '\n')
   cat('Observations:', length(train) + length(validation), '\n')
   cat('Training Observations:', length(train), ' -> ' ,train, '\n')
   cat('Validation Observations:', length(validation), ' -> ', validation, '\n')
@@ -394,6 +396,6 @@ for (i in 1:length(splits$test)) {
   # Luego partiendo de  FE0001
   # genero TS0002, HT0002 y ZZ0002
   
-  corrida_guantesblancos_202107( "gb02", i, train, validation, test )
+  #corrida_guantesblancos_202107( "gb02", i, train, validation, test )
 }
 
