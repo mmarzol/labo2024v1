@@ -47,7 +47,8 @@ GrabarOutput <- function() {
 AgregarVariables_IntraMes <- function(dataset) {
   gc()
   # INICIO de la seccion donde se deben hacer cambios con variables nuevas
-
+  # Add a new column extracting the last two characters from foto_mes
+  dataset[, mes_para_estacionalidad := foto_mes %% 100]
   # creo un ctr_quarter que tenga en cuenta cuando
   # los clientes hace 3 menos meses que estan
   dataset[, ctrx_quarter_normalizado := ctrx_quarter]
